@@ -1,0 +1,38 @@
+{
+  "packageId": "com.chutkule.vichar.hindistatus",
+  "host": "ais-pre-4su6wuoynlbd7lbsjqwvy6-933494204520.asia-east1.run.app",
+  "name": "चुटकुले & विचार - Jokes, Status & Quotes",
+  "launcherName": "चुटकुले",
+  "display": "standalone",
+  "themeColor": "#F97316",
+  "navigationColor": "#0F172A",
+  "navigationColorDark": "#0F172A",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#0F172A",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ais-pre-4su6wuoynlbd7lbsjqwvy6-933494204520.asia-east1.run.app/pwa-512x512.png",
+  "maskableIconUrl": "https://ais-pre-4su6wuoynlbd7lbsjqwvy6-933494204520.asia-east1.run.app/pwa-maskable-512x512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ais-pre-4su6wuoynlbd7lbsjqwvy6-933494204520.asia-east1.run.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "orientation": "portrait-primary",
+  "fingerprints": []
+}

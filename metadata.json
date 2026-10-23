@@ -1,0 +1,6 @@
+{
+  "name": "Chutkule & Vichar - Jokes, Status & Quotes Hub",
+  "description": "1000+ Funny Jokes, Motivational Quotes, Daily Thoughts, Shayari, Status with Multi-Theme Colors, Dark Mode, Card Image Creator & Instant Social Share.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

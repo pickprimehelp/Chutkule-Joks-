@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">चुटकुले और विचार</string>
+    <string name="title_activity_main">चुटकुले और विचार</string>
+    <string name="package_name">com.chutkule.vichar.hindistatus</string>
+    <string name="custom_url_scheme">com.chutkule.vichar.hindistatus</string>
+</resources>

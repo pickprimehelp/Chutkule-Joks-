@@ -1,0 +1,9 @@
+{
+	"appId": "com.chutkule.vichar.hindistatus",
+	"appName": "चुटकुले और विचार",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"server": {
+		"androidScheme": "https"
+	}
+}

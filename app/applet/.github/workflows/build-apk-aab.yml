@@ -1,0 +1,167 @@
+name: Build Android APK and AAB
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: 📱 Build Android APK & AAB (Play Store Ready)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: 🟢 Set up Node.js 22 (Required by Capacitor CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 📦 Install Node Dependencies
+        run: |
+          npm install --legacy-peer-deps
+
+      - name: 🔨 Build Vite Frontend (dist)
+        run: |
+          npm run build
+
+      - name: 🔄 Sync Capacitor Android Assets
+        run: |
+          # 1. Agar repository me android folder nahi hai toh auto-create karein
+          if [ ! -d "android" ]; then
+            echo "⚠️ 'android' folder not found in repository. Initializing Capacitor Android platform..."
+            npx --yes @capacitor/cli add android
+          fi
+
+          # 2. Capacitor Android Assets sync karein
+          echo "Syncing Capacitor Android assets..."
+          npx --yes @capacitor/cli sync android
+
+          # 3. Ensure gradlew is executable
+          if [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+          fi
+
+      - name: 📱 Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+
+      - name: 🔑 Configure Release Keystore & Gradle Signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'chutkule123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'chutkule' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'chutkule123' }}
+        run: |
+          mkdir -p android/app
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding Keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+          else
+            echo "Generating automated release signing key..."
+            keytool -genkeypair -v \
+              -keystore android/app/release.jks \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=ChutkuleApp, OU=Mobile, O=Chutkule, L=Delhi, S=Delhi, C=IN"
+          fi
+          echo "Keystore ready at android/app/release.jks"
+
+          # Ensure android/app/build.gradle contains signing config
+          if ! grep -q "signingConfigs" android/app/build.gradle; then
+            echo "Configuring release signing in android/app/build.gradle..."
+            sed -i '/defaultConfig {/i \    signingConfigs {\n        release {\n            storeFile file("release.jks")\n            storePassword "chutkule123"\n            keyAlias "chutkule"\n            keyPassword "chutkule123"\n        }\n    }\n' android/app/build.gradle
+            sed -i '/buildTypes {/a \        release {\n            signingConfig signingConfigs.release\n        }' android/app/build.gradle
+          fi
+
+      - name: 🚀 Build APK & AAB with Gradle
+        env:
+          KEYSTORE_PATH: "release.jks"
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'chutkule123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'chutkule' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'chutkule123' }}
+        run: |
+          cd android
+          chmod +x gradlew
+          
+          echo "1. Building Debug APK (Install and test directly on phone)..."
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          
+          echo "2. Building Release APK..."
+          ./gradlew assembleRelease --no-daemon --stacktrace || true
+          
+          echo "3. Building Release AAB Bundle (Play Store Console upload format)..."
+          ./gradlew bundleRelease --no-daemon --stacktrace
+          
+          cd ..
+
+      - name: 📂 Organize Artifacts
+        run: |
+          mkdir -p android-artifacts
+          
+          # Copy Debug APK
+          find android/app/build/outputs/apk/debug -name "*.apk" -exec cp {} android-artifacts/Chutkule-Vichar-debug.apk \; || true
+          
+          # Copy Release APK
+          find android/app/build/outputs/apk/release -name "*.apk" -exec cp {} android-artifacts/Chutkule-Vichar-release.apk \; || true
+          
+          # Copy Play Store AAB Bundle
+          find android/app/build/outputs/bundle/release -name "*.aab" -exec cp {} android-artifacts/Chutkule-Vichar-playstore.aab \; || true
+          
+          # Copy Keystore file for safe keeping
+          if [ -f android/app/release.jks ]; then
+            cp android/app/release.jks android-artifacts/chutkule-release.jks
+          fi
+          
+          echo "Created the following Android build artifacts:"
+          ls -lh android-artifacts/
+
+      - name: 📤 Upload APK & AAB Artifacts (1-Click Download)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutkule-Vichar-Android-APK-AAB
+          path: android-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 📝 Output GitHub Step Summary
+        run: |
+          echo "## 🎉 Android APK & AAB Build Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Available Artifacts in this Run:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-playstore.aab**: Google Play Console पर अपलोड करने के लिए मुख्य AAB फ़ाइल।" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-debug.apk**: अपने फ़ोन पर तुरंत इंस्टॉल और टेस्ट करने के लिए APK फ़ाइल।" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-release.apk**: हस्ताक्षरित (Signed) रिलीज़ APK फ़ाइल।" >> $GITHUB_STEP_SUMMARY
+          echo "- **chutkule-release.jks**: ऐप की साइनिंग की-स्टोर फ़ाइल (सुरक्षित रखें)।" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔑 Keystore Credentials:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Store Password:** \`chutkule123\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Key Alias:** \`chutkule\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Key Password:** \`chutkule123\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🏷️ Publish GitHub Release (if version tag pushed)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android-artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

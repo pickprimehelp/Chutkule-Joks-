@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF512F" />
+      <stop offset="50%" stop-color="#DD2476" />
+      <stop offset="100%" stop-color="#7928CA" />
+    </linearGradient>
+    <linearGradient id="starGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE000" />
+      <stop offset="100%" stop-color="#799F0C" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)" />
+  <g filter="url(#shadow)">
+    <!-- Speech bubble -->
+    <path d="M120 160 C120 115 156 80 200 80 L312 80 C356 80 392 115 392 160 L392 270 C392 315 356 350 312 350 L220 350 L150 410 L160 350 L200 350 C156 350 120 315 120 270 Z" fill="#FFFFFF" />
+    <!-- Laughing Eyes -->
+    <path d="M185 200 Q210 175 235 200" stroke="#DD2476" stroke-width="14" stroke-linecap="round" fill="none" />
+    <path d="M277 200 Q302 175 327 200" stroke="#DD2476" stroke-width="14" stroke-linecap="round" fill="none" />
+    <!-- Big joyful smile -->
+    <path d="M190 235 Q256 305 322 235" stroke="#DD2476" stroke-width="14" stroke-linecap="round" fill="#FFCCD5" />
+    <path d="M215 270 Q256 305 297 270" fill="#E11D48" />
+  </g>
+  <!-- Sparkles -->
+  <path d="M380 90 L390 115 L415 125 L390 135 L380 160 L370 135 L345 125 L370 115 Z" fill="#FFE000" />
+  <path d="M100 340 L107 355 L122 362 L107 369 L100 384 L93 369 L78 362 L93 355 Z" fill="#FFE000" />
+</svg>
