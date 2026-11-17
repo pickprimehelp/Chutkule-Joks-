@@ -5,7 +5,6 @@ import {
   Bell,
   Sun,
   Moon,
-  Smartphone,
   Star,
   Download,
   X,
@@ -24,7 +23,6 @@ interface HeaderProps {
   isFavoritesView: boolean;
   onOpenNotifications: () => void;
   onOpenRating: () => void;
-  onOpenPlayStoreGuide: () => void;
   onOpenShareApp: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -39,7 +37,6 @@ export const Header: React.FC<HeaderProps> = ({
   isFavoritesView,
   onOpenNotifications,
   onOpenRating,
-  onOpenPlayStoreGuide,
   onOpenShareApp,
   searchQuery,
   onSearchChange,
@@ -129,16 +126,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <Share2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               )}
               <span className="hidden sm:inline font-semibold">{appShared ? 'शेयर' : 'ऐप शेयर'}</span>
-            </button>
-
-            {/* PlayStore & APK Guide Button (Desktop/Tablet) */}
-            <button
-              onClick={onOpenPlayStoreGuide}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition shadow-sm"
-              title="Play Store APK & GitHub Guide"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>APK गाइड</span>
             </button>
 
             {/* In-app Install Button (PWA) */}

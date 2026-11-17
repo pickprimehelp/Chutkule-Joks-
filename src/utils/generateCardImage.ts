@@ -1,5 +1,11 @@
+import { Capacitor } from '@capacitor/core';
 import { Item, CategoryTheme } from '../types';
-import { shareImageToWhatsApp, downloadOrSaveImageFile, dataUrlToBlob } from './shareUtils';
+import {
+  shareImageToWhatsApp,
+  downloadOrSaveImageFile,
+  downloadImageBlob,
+  dataUrlToBlob,
+} from './shareUtils';
 
 export interface CardImageOptions {
   aspectRatio?: 'square' | 'story'; // square 1080x1080, story 1080x1920
@@ -13,6 +19,32 @@ export interface CardRenderResult {
   filename: string;
   width: number;
   height: number;
+}
+
+/**
+ * Cross-browser / WebView compatible rounded rectangle path helper
+ * (replaces ctx.roundRect which throws on Android WebViews older than Chromium 99)
+ */
+export function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 /**
@@ -38,7 +70,7 @@ export function renderCardCanvas(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not get 2D context');
 
-  // 1. Rich category vibrant multi-color gradient (NO black backgrounds)
+  // 1. Rich category vibrant multi-color gradient
   const [c1, c2, c3] = category.cardGradients || ['#FF512F', '#F09819', '#E11D48'];
   const grad = ctx.createLinearGradient(0, 0, width, height);
   grad.addColorStop(0, c1);
@@ -69,16 +101,14 @@ export function renderCardCanvas(
   ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.40)';
   ctx.shadowBlur = 40;
-  ctx.beginPath();
-  ctx.roundRect(margin, margin, cardW, cardH, 44);
+  drawRoundRect(ctx, margin, margin, cardW, cardH, 44);
   ctx.fill();
   ctx.restore();
 
   // Glowing border outline
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.40)';
   ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(margin, margin, cardW, cardH, 44);
+  drawRoundRect(ctx, margin, margin, cardW, cardH, 44);
   ctx.stroke();
 
   // 3. Category Header & Icon Badge
@@ -156,7 +186,7 @@ export function renderCardCanvas(
 
   // 6. Author or character tag
   if (item.authorOrCharacter) {
-    ctx.fillStyle = '#FFE082'; // Bright Warm Gold
+    ctx.fillStyle = '#FFE082';
     ctx.font = 'bold 34px "Outfit", "Hind", sans-serif';
     ctx.fillText(`— ${item.authorOrCharacter}`, width / 2, startY + 55);
   }
@@ -169,8 +199,7 @@ export function renderCardCanvas(
 
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.40)';
-    ctx.beginPath();
-    ctx.roundRect(width / 2 - pillW / 2, wmBoxY - pillH / 2, pillW, pillH, 32);
+    drawRoundRect(ctx, width / 2 - pillW / 2, wmBoxY - pillH / 2, pillW, pillH, 32);
     ctx.fill();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 2;
@@ -238,7 +267,12 @@ export async function shareCardDirectly(
 }> {
   const cardData = getCardImageDataSync(item, category, { aspectRatio: 'story', includeWatermark });
   try {
-    const result = await shareImageToWhatsApp(cardData.blob, item.text, cardData.filename);
+    const result = await shareImageToWhatsApp(
+      cardData.blob,
+      item.text,
+      cardData.filename,
+      cardData.dataUrl
+    );
     return {
       success: result.success,
       downloadedFallback: result.method === 'download_and_whatsapp',
@@ -257,7 +291,7 @@ export async function shareCardDirectly(
 
 /**
  * 1-Tap Download Card to phone gallery / downloads
- * @param includeWatermark whether to draw watermark (default true)
+ * Synchronous on Web (preserving user gesture!), native Filesystem save on Capacitor Android.
  */
 export async function downloadCardDirectly(
   item: Item,
@@ -268,15 +302,32 @@ export async function downloadCardDirectly(
   filename: string;
   dataUrl: string;
   blob: Blob;
+  savedPath?: string;
+  savedUri?: string;
 }> {
   const cardData = getCardImageDataSync(item, category, { aspectRatio: 'story', includeWatermark });
+
+  // On Web: trigger synchronous download immediately without yielding to async microtasks
+  if (!Capacitor.isNativePlatform()) {
+    const ok = downloadImageBlob(cardData.blob, cardData.filename);
+    return {
+      success: ok,
+      filename: cardData.filename,
+      dataUrl: cardData.dataUrl,
+      blob: cardData.blob,
+    };
+  }
+
+  // On Native Android APK: write to Documents/ChutkuleVichar/ with permission check
   try {
-    const result = await downloadOrSaveImageFile(cardData.blob, cardData.filename);
+    const result = await downloadOrSaveImageFile(cardData.blob, cardData.filename, cardData.dataUrl);
     return {
       success: result.success,
       filename: cardData.filename,
       dataUrl: cardData.dataUrl,
       blob: cardData.blob,
+      savedPath: result.savedPath,
+      savedUri: result.savedUri,
     };
   } catch (err) {
     console.error('Direct card download failed', err);

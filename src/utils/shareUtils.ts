@@ -3,7 +3,7 @@ import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 /**
- * Universal Mobile-First Share Utilities for WhatsApp & Social Media
+ * Universal Mobile-First Share & Download Utilities for WhatsApp, Web & Capacitor Android
  */
 
 export function isMobileDevice(): boolean {
@@ -43,11 +43,19 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
+ * Extracts pure Base64 synchronously from a dataUrl if available
+ */
+function extractBase64FromDataUrl(dataUrl?: string): string | null {
+  if (!dataUrl || !dataUrl.includes(',')) return null;
+  return dataUrl.split(',')[1] || null;
+}
+
+/**
  * Converts Data URL string to Blob synchronously
  */
 export function dataUrlToBlob(dataUrl: string): Blob {
   const arr = dataUrl.split(',');
-  const mime = arr[0].match(/:(.*?);/)![1];
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
@@ -66,36 +74,37 @@ export function getWhatsAppUrl(text: string): string {
 }
 
 /**
- * Downloads an image directly to the user's gallery / downloads
- * Uses Data URL + Blob URL + direct click for maximum browser/webview compatibility
- */
-/**
- * Downloads an image directly to the user's gallery / downloads folder.
- * Uses a Blob URL with application/octet-stream so mobile Chrome & Safari force a file download
- * instead of blocking data: URLs.
+ * Synchronously triggers PNG image download on web browsers using image/png Blob URL.
+ * Must be invoked synchronously within a user gesture for mobile Chrome/Safari compatibility.
  */
 export function downloadImageBlob(blob: Blob, filename: string): boolean {
   try {
-    // 1. Force octet-stream so the browser triggers file save dialog / download manager
-    const downloadBlob = new Blob([blob], { type: 'application/octet-stream' });
-    const blobUrl = URL.createObjectURL(downloadBlob);
+    const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' });
+    const blobUrl = URL.createObjectURL(pngBlob);
 
     const a = document.createElement('a');
     a.href = blobUrl;
     a.download = filename;
     a.setAttribute('download', filename);
+    a.type = 'image/png';
     a.rel = 'noopener noreferrer';
-    a.style.display = 'none';
+    a.style.position = 'fixed';
+    a.style.left = '-9999px';
+    a.style.top = '-9999px';
+    a.style.opacity = '0';
+    a.style.pointerEvents = 'none';
     document.body.appendChild(a);
 
     a.click();
 
     setTimeout(() => {
       try {
-        document.body.removeChild(a);
+        if (a.parentNode) {
+          a.parentNode.removeChild(a);
+        }
         URL.revokeObjectURL(blobUrl);
       } catch {}
-    }, 20000);
+    }, 60000);
 
     return true;
   } catch (e) {
@@ -105,59 +114,150 @@ export function downloadImageBlob(blob: Blob, filename: string): boolean {
 }
 
 /**
- * Saves/downloads an image file directly to the user's phone gallery / downloads
- * 1. Native Capacitor (Android APK): writes file to device & triggers system save
- * 2. Web browser: triggers direct file save
+ * Ensures Capacitor Filesystem storage permissions on Android 9/10 and older
+ */
+async function ensureNativeStoragePermission(): Promise<void> {
+  try {
+    const status = await Filesystem.checkPermissions();
+    if (status.publicStorage !== 'granted') {
+      await Filesystem.requestPermissions();
+    }
+  } catch {
+    // Scoped storage on Android 11+ does not always require runtime permission for Documents
+  }
+}
+
+/**
+ * Saves/downloads an image file directly to the user's phone Documents/Gallery or Downloads.
+ * 1. Native Capacitor (Android APK): requests permission if needed, writes PNG to Documents/ChutkuleVichar/,
+ *    and falls back to Cache + native Share Sheet if Documents write is restricted.
+ * 2. Web browser: synchronously triggers PNG download via anchor click.
  */
 export async function downloadOrSaveImageFile(
   blob: Blob,
-  filename: string
-): Promise<{ success: boolean; method: 'native' | 'web'; dataUrl?: string }> {
-  // 1. If Native Android APK
+  filename: string,
+  dataUrlHint?: string
+): Promise<{
+  success: boolean;
+  method: 'native' | 'web';
+  dataUrl?: string;
+  savedPath?: string;
+  savedUri?: string;
+}> {
   if (Capacitor.isNativePlatform()) {
     try {
-      const base64Data = await blobToBase64(blob);
-      const saved = await Filesystem.writeFile({
-        path: filename,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true,
-      });
+      await ensureNativeStoragePermission();
+      const base64Data = extractBase64FromDataUrl(dataUrlHint) || (await blobToBase64(blob));
 
-      // Also trigger Native Share with Save option for gallery
-      await Share.share({
-        title: 'फोटो कार्ड सेव करें',
-        url: saved.uri,
-        dialogTitle: 'कार्ड गैलरी में सेव करें',
-      });
+      // Primary: Write directly into Documents/ChutkuleVichar/<filename>
+      try {
+        const relativePath = `ChutkuleVichar/${filename}`;
+        const saved = await Filesystem.writeFile({
+          path: relativePath,
+          data: base64Data,
+          directory: Directory.Documents,
+          recursive: true,
+        });
 
-      return { success: true, method: 'native' };
+        return {
+          success: true,
+          method: 'native',
+          savedPath: `Documents/${relativePath}`,
+          savedUri: saved.uri,
+          dataUrl: dataUrlHint,
+        };
+      } catch (docErr) {
+        console.warn('Documents write failed, falling back to Cache + Share:', docErr);
+        const cached = await Filesystem.writeFile({
+          path: filename,
+          data: base64Data,
+          directory: Directory.Cache,
+        });
+
+        await Share.share({
+          title: 'फोटो कार्ड सेव करें',
+          files: [cached.uri],
+          dialogTitle: 'कार्ड गैलरी में सेव करें',
+        });
+
+        return {
+          success: true,
+          method: 'native',
+          savedUri: cached.uri,
+          dataUrl: dataUrlHint,
+        };
+      }
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.message?.includes('cancel')) {
-        return { success: true, method: 'native' };
+        return { success: false, method: 'native', dataUrl: dataUrlHint };
       }
-      console.warn('Native filesystem write failed, fallback to web download', err);
+      console.warn('Native save failed completely:', err);
+      return { success: false, method: 'native', dataUrl: dataUrlHint };
     }
   }
 
-  // 2. Web browser direct download
-  let dataUrl: string | undefined;
-  try {
-    dataUrl = await blobToDataUrl(blob);
-  } catch {}
+  // Web browser synchronous download (do NOT await before calling downloadImageBlob)
+  const ok = downloadImageBlob(blob, filename);
+  return { success: ok, method: 'web', dataUrl: dataUrlHint };
+}
 
-  await downloadImageBlob(blob, filename);
-  return { success: true, method: 'web', dataUrl };
+/**
+ * Opens Android Share Sheet (native APK) or Web Share API (mobile browser) with the actual PNG image file
+ * so the user can save to Photos/Gallery or share to any app.
+ */
+export async function shareImageToGalleryNativeOrWeb(
+  blob: Blob,
+  filename: string,
+  title: string = 'चुटकुले और विचार कार्ड',
+  dataUrlHint?: string
+): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const base64Data = extractBase64FromDataUrl(dataUrlHint) || (await blobToBase64(blob));
+      const savedFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title,
+        files: [savedFile.uri],
+        dialogTitle: 'गैलरी में सेव करें या शेयर करें',
+      });
+      return 'shared';
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message?.includes('cancel')) {
+        return 'cancelled';
+      }
+    }
+  }
+
+  try {
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title,
+      });
+      return 'shared';
+    }
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return 'cancelled';
+    }
+  }
+
+  downloadImageBlob(blob, filename);
+  return 'downloaded';
 }
 
 /**
  * Directly opens WhatsApp App on mobile (or Web on desktop) with formatted text
- * Guaranteed to bypass iframe sandboxing and popup blockers
  */
 export function openWhatsAppDirect(text: string): void {
   const targetUrl = getWhatsAppUrl(text);
 
-  // 1. Attempt top-level navigation if in an iframe
   try {
     if (window.top && window.top !== window) {
       window.top.location.href = targetUrl;
@@ -165,24 +265,24 @@ export function openWhatsAppDirect(text: string): void {
     }
   } catch {}
 
-  // 2. Create and trigger explicit anchor element
   try {
     const link = document.createElement('a');
     link.href = targetUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.style.display = 'none';
+    link.style.position = 'fixed';
+    link.style.left = '-9999px';
+    link.style.opacity = '0';
     document.body.appendChild(link);
     link.click();
     setTimeout(() => {
       try {
-        document.body.removeChild(link);
+        if (link.parentNode) link.parentNode.removeChild(link);
       } catch {}
     }, 1000);
   } catch {
-    // 3. Direct window open fallback
     try {
-      window.open(targetUrl, '_blank');
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } catch {
       window.location.href = targetUrl;
     }
@@ -191,24 +291,20 @@ export function openWhatsAppDirect(text: string): void {
 
 /**
  * Shares an image file to WhatsApp / Social Media
- * 1. If Native Android APK (Capacitor): writes to cache & invokes native Android Share Sheet (WhatsApp, Status, etc.)
- * 2. If Web / Browser with Web Share API: shares file directly
- * 3. Fallback: downloads card image to gallery AND opens WhatsApp
+ * 1. Native Android APK (Capacitor): writes PNG to Cache & attaches via `files: [uri]`
+ * 2. Mobile Chrome / Safari: Web Share API with `files: [File]`
+ * 3. Desktop / Web fallback: downloads PNG card synchronously + opens WhatsApp
  */
 export async function shareImageToWhatsApp(
   blob: Blob,
   text: string,
-  filename: string = 'chutkule-status.png'
+  filename: string = 'chutkule-status.png',
+  dataUrlHint?: string
 ): Promise<{ method: 'native' | 'download_and_whatsapp'; success: boolean; dataUrl?: string }> {
-  let dataUrl: string | undefined;
-  try {
-    dataUrl = await blobToDataUrl(blob);
-  } catch {}
-
   // 1. Native Capacitor Platform (Android APK)
   if (Capacitor.isNativePlatform()) {
     try {
-      const base64Data = await blobToBase64(blob);
+      const base64Data = extractBase64FromDataUrl(dataUrlHint) || (await blobToBase64(blob));
       const savedFile = await Filesystem.writeFile({
         path: filename,
         data: base64Data,
@@ -218,14 +314,14 @@ export async function shareImageToWhatsApp(
       await Share.share({
         title: 'चुटकुले और विचार',
         text: `${text}\n\n📲 ऐप: चुटकुले और विचार`,
-        url: savedFile.uri,
+        files: [savedFile.uri],
         dialogTitle: 'WhatsApp स्टेटस या चैट में शेयर करें',
       });
 
-      return { method: 'native', success: true, dataUrl };
+      return { method: 'native', success: true, dataUrl: dataUrlHint };
     } catch (err: any) {
-      if (err?.name === 'AbortError' || err?.message?.includes('canceled') || err?.message?.includes('cancelled')) {
-        return { method: 'native', success: false, dataUrl };
+      if (err?.name === 'AbortError' || err?.message?.includes('cancel')) {
+        return { method: 'native', success: false, dataUrl: dataUrlHint };
       }
       console.warn('Native Capacitor share failed, continuing with fallback', err);
     }
@@ -241,11 +337,10 @@ export async function shareImageToWhatsApp(
           title: 'चुटकुले और विचार',
           text: `${text}\n\n📲 ऐप: चुटकुले और विचार`,
         });
-        return { method: 'native', success: true, dataUrl };
+        return { method: 'native', success: true, dataUrl: dataUrlHint };
       } catch (err: any) {
         if (err.name === 'AbortError') {
-          // User dismissed share dialog
-          return { method: 'native', success: false, dataUrl };
+          return { method: 'native', success: false, dataUrl: dataUrlHint };
         }
         console.warn('Navigator.share error, falling through to download + WhatsApp redirect', err);
       }
@@ -255,11 +350,8 @@ export async function shareImageToWhatsApp(
   }
 
   // 3. Reliable Web Fallback:
-  // First download the card image to user's gallery / downloads folder
-  await downloadImageBlob(blob, filename);
-
-  // Then directly launch WhatsApp app
+  downloadImageBlob(blob, filename);
   openWhatsAppDirect(`${text}\n\n📲 फोटो कार्ड गैलरी में सेव हो गया है!`);
 
-  return { method: 'download_and_whatsapp', success: true, dataUrl };
+  return { method: 'download_and_whatsapp', success: true, dataUrl: dataUrlHint };
 }

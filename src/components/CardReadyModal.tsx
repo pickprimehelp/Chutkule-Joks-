@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { X, Download, Sparkles, CheckCircle2, Award, Share2, ExternalLink } from 'lucide-react';
-import { getWhatsAppUrl, downloadImageBlob } from '../utils/shareUtils';
+import {
+  getWhatsAppUrl,
+  downloadOrSaveImageFile,
+  shareImageToGalleryNativeOrWeb,
+} from '../utils/shareUtils';
 
 export interface CardReadyData {
   imageUrl: string;
@@ -9,6 +14,9 @@ export interface CardReadyData {
   text: string;
   hasWatermark: boolean;
   categoryName?: string;
+  savedPath?: string;
+  savedUri?: string;
+  autoDownloaded?: boolean;
 }
 
 interface CardReadyModalProps {
@@ -17,29 +25,30 @@ interface CardReadyModalProps {
 }
 
 export const CardReadyModal: React.FC<CardReadyModalProps> = ({ cardData, onClose }) => {
-  const [blobDownloadUrl, setBlobDownloadUrl] = useState<string>('');
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
-  const [canNativeShare, setCanNativeShare] = useState(false);
+  const [pngBlobUrl, setPngBlobUrl] = useState<string>('');
+  const [downloadStatusMsg, setDownloadStatusMsg] = useState<string | null>(null);
+  const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
     if (!cardData?.blob) {
-      setBlobDownloadUrl('');
+      setPngBlobUrl('');
+      setDownloadStatusMsg(null);
       return;
     }
 
-    // Force application/octet-stream so browser download manager saves file
-    const octetBlob = new Blob([cardData.blob], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(octetBlob);
-    setBlobDownloadUrl(url);
+    const pngBlob =
+      cardData.blob.type === 'image/png'
+        ? cardData.blob
+        : new Blob([cardData.blob], { type: 'image/png' });
+    const url = URL.createObjectURL(pngBlob);
+    setPngBlobUrl(url);
 
-    // Check if device supports sharing file directly (Android/iOS Chrome/Safari)
-    try {
-      const testFile = new File([cardData.blob], cardData.filename, { type: 'image/png' });
-      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [testFile] })) {
-        setCanNativeShare(true);
-      }
-    } catch {
-      setCanNativeShare(false);
+    if (cardData.savedPath) {
+      setDownloadStatusMsg(`✅ फ़ाइल सेव हो गई: ${cardData.savedPath}`);
+    } else if (cardData.autoDownloaded) {
+      setDownloadStatusMsg('✅ डाउनलोड शुरू हो गया! Downloads फ़ोल्डर या गैलरी चेक करें।');
+    } else {
+      setDownloadStatusMsg(null);
     }
 
     return () => {
@@ -52,40 +61,34 @@ export const CardReadyModal: React.FC<CardReadyModalProps> = ({ cardData, onClos
   const whatsAppShareText = `${cardData.text}\n\n📲 फोटो कार्ड देखें! (चुटकुले और विचार ऐप)`;
   const whatsAppUrl = getWhatsAppUrl(whatsAppShareText);
 
-  // Direct 1-Tap Download Handler
-  const handleDownloadClick = () => {
-    const success = downloadImageBlob(cardData.blob, cardData.filename);
-    if (success) {
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 4000);
-    }
-  };
-
-  // Native Android/iOS Device Save / Share
-  const handleNativeShare = async () => {
-    try {
-      const file = new File([cardData.blob], cardData.filename, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'चुटकुले और विचार',
-          text: whatsAppShareText,
-        });
-      }
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') {
-        handleDownloadClick();
-      }
-    }
-  };
-
-  // Open in new tab fallback
-  const handleOpenImage = () => {
-    const imgWindow = window.open();
-    if (imgWindow) {
-      imgWindow.document.write(
-        `<title>${cardData.filename}</title><body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${cardData.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;"/></body>`
+  const handleNativeDownload = async () => {
+    const res = await downloadOrSaveImageFile(cardData.blob, cardData.filename, cardData.imageUrl);
+    if (res.success) {
+      setDownloadStatusMsg(
+        res.savedPath
+          ? `✅ फ़ाइल सेव हो गई: ${res.savedPath}`
+          : '✅ फोटो कार्ड सफलतापूर्वक सेव हो गया!'
       );
+    } else {
+      setDownloadStatusMsg('कृपया नीचे "गैलरी में सेव / शेयर" बटन आज़माएं।');
+    }
+  };
+
+  const handleWebAnchorClick = () => {
+    setDownloadStatusMsg('✅ डाउनलोड शुरू हो गया! फ़ोन के Downloads फ़ोल्डर में चेक करें।');
+  };
+
+  const handleGalleryOrShare = async () => {
+    const result = await shareImageToGalleryNativeOrWeb(
+      cardData.blob,
+      cardData.filename,
+      'चुटकुले और विचार फोटो कार्ड',
+      cardData.imageUrl
+    );
+    if (result === 'downloaded') {
+      setDownloadStatusMsg('✅ फोटो कार्ड डाउनलोड हो गया!');
+    } else if (result === 'shared') {
+      setDownloadStatusMsg('✅ गैलरी / ऐप विकल्प खुल गए!');
     }
   };
 
@@ -132,12 +135,12 @@ export const CardReadyModal: React.FC<CardReadyModalProps> = ({ cardData, onClos
 
         {/* Content Body */}
         <div className="p-4 overflow-y-auto flex flex-col items-center text-center space-y-3.5">
-          {/* Card Preview Image */}
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700 max-h-[44vh] bg-slate-950 flex items-center justify-center group">
+          {/* Card Preview Image (long-press enabled for mobile gallery save) */}
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700 max-h-[42vh] bg-slate-950 flex items-center justify-center">
             <img
-              src={cardData.imageUrl}
+              src={pngBlobUrl || cardData.imageUrl}
               alt="Generated Joke Card"
-              className="max-h-[44vh] w-auto object-contain rounded-xl select-none"
+              className="max-h-[42vh] w-auto object-contain rounded-xl"
             />
           </div>
 
@@ -153,45 +156,46 @@ export const CardReadyModal: React.FC<CardReadyModalProps> = ({ cardData, onClos
           </div>
 
           {/* Success Banner */}
-          {downloadSuccess && (
-            <div className="w-full p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-semibold animate-pulse">
-              ✅ डाउनलोड शुरू हो गया! फ़ोन के 'Downloads' फ़ोल्डर या गैलरी में चेक करें।
+          {downloadStatusMsg && (
+            <div className="w-full p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-semibold">
+              {downloadStatusMsg}
             </div>
           )}
 
           {/* PRIMARY ACTION BUTTONS */}
           <div className="w-full space-y-2">
-            {/* Button 1: DIRECT DOWNLOAD BUTTON (Uses octet-stream Blob URL) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                onClick={handleDownloadClick}
-                className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-95 transition-all"
-                title="फोटो कार्ड सीधे फ़ोन में डाउनलोड करें"
-              >
-                <Download className="w-4 h-4 flex-shrink-0" />
-                <span>कार्ड डाउनलोड करें</span>
-              </button>
-
-              {/* Native Save to Photos / Share Sheet for Android */}
-              {canNativeShare ? (
+              {isNative ? (
                 <button
-                  onClick={handleNativeShare}
-                  className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 active:scale-95 transition-all"
-                  title="फ़ोन गैलरी में सेव या शेयर करें"
+                  onClick={handleNativeDownload}
+                  className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-95 transition-all"
+                  title="फोटो कार्ड सीधे फ़ोन में सेव करें"
                 >
-                  <Share2 className="w-4 h-4 flex-shrink-0" />
-                  <span>गैलरी में सेव / शेयर</span>
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span>कार्ड डाउनलोड करें</span>
                 </button>
               ) : (
                 <a
-                  href={blobDownloadUrl}
+                  href={pngBlobUrl || cardData.imageUrl}
                   download={cardData.filename}
-                  className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  type="image/png"
+                  onClick={handleWebAnchorClick}
+                  className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-95 transition-all"
+                  title="फोटो कार्ड सीधे फ़ोन में डाउनलोड करें"
                 >
-                  <Download className="w-4 h-4 flex-shrink-0 text-amber-400" />
-                  <span>फ़ाइल सेव करें</span>
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span>कार्ड डाउनलोड करें</span>
                 </a>
               )}
+
+              <button
+                onClick={handleGalleryOrShare}
+                className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 active:scale-95 transition-all"
+                title="फ़ोन गैलरी में सेव या शेयर करें"
+              >
+                <Share2 className="w-4 h-4 flex-shrink-0" />
+                <span>गैलरी में सेव / शेयर</span>
+              </button>
             </div>
 
             {/* Button 2: WhatsApp Direct Open Link */}
@@ -216,13 +220,17 @@ export const CardReadyModal: React.FC<CardReadyModalProps> = ({ cardData, onClos
             💡 <strong>गैलरी में सेव करने की आसान टिप:</strong> ऊपर दिख रही फोटो पर १ सेकंड उंगली दबाकर रखें (Long Press) और <strong>'Save image'</strong> या <strong>'Download'</strong> चुनें।
           </div>
 
-          <button
-            onClick={handleOpenImage}
-            className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition"
-          >
-            <ExternalLink className="w-3 h-3" />
-            <span>फोटो नई विंडो में खोलें</span>
-          </button>
+          {!isNative && pngBlobUrl && (
+            <a
+              href={pngBlobUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>फोटो नई विंडो में खोलें</span>
+            </a>
+          )}
         </div>
 
         {/* Footer */}

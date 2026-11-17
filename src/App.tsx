@@ -12,7 +12,6 @@ import { JokeCard } from './components/JokeCard';
 import { CardImageModal } from './components/CardImageModal';
 import { RatingModal } from './components/RatingModal';
 import { NotificationModal } from './components/NotificationModal';
-import { PlayStoreGuideModal } from './components/PlayStoreGuideModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { ShareAppModal } from './components/ShareAppModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -21,19 +20,12 @@ import { AdBanner } from './components/AdBanner';
 import { NativeAdCard } from './components/NativeAdCard';
 import { InterstitialAdModal } from './components/InterstitialAdModal';
 import { RewardedAdModal } from './components/RewardedAdModal';
-import { AdSettingsModal } from './components/AdSettingsModal';
 import { CardReadyModal, CardReadyData } from './components/CardReadyModal';
 import {
-  Sparkles,
   Shuffle,
   ChevronDown,
   Heart,
-  Smile,
-  Search,
-  Filter,
   ArrowUp,
-  Download,
-  Share2,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 24;
@@ -68,20 +60,15 @@ export default function App() {
   const [activeCardItem, setActiveCardItem] = useState<{ item: Item; categoryId: CategoryId } | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [showPlayStoreGuide, setShowPlayStoreGuide] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showShareAppModal, setShowShareAppModal] = useState(false);
-  const [showAdSettings, setShowAdSettings] = useState(false);
   const [cardReadyData, setCardReadyData] = useState<CardReadyData | null>(null);
 
-  // AdMob & AdSense Ads Hook
+  // AdMob Ads Hook
   const {
     adConfig,
-    updateAdConfig,
-    resetToTestIds,
     isInterstitialOpen,
     isRewardedOpen,
-    showInterstitial,
     showRewarded,
     closeInterstitial,
     closeRewarded,
@@ -167,7 +154,6 @@ export default function App() {
         isFavoritesView={isFavoritesView}
         onOpenNotifications={() => setShowNotificationModal(true)}
         onOpenRating={() => setShowRatingModal(true)}
-        onOpenPlayStoreGuide={() => setShowPlayStoreGuide(true)}
         onOpenShareApp={() => setShowShareAppModal(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -283,7 +269,6 @@ export default function App() {
           <AdBanner
             adConfig={adConfig}
             format="inline"
-            onOpenSettings={() => setShowAdSettings(true)}
           />
         </div>
 
@@ -303,7 +288,7 @@ export default function App() {
                     {showNativeAdHere && (
                       <NativeAdCard
                         adConfig={adConfig}
-                        onOpenSettings={() => setShowAdSettings(true)}
+                        slotKey={`native_slot_${index}`}
                       />
                     )}
                     <JokeCard
@@ -432,14 +417,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Play Store APK & GitHub Guide Modal */}
-      {showPlayStoreGuide && (
-        <PlayStoreGuideModal
-          onClose={() => setShowPlayStoreGuide(false)}
-          onOpenPrivacyPolicy={() => setShowPrivacyPolicy(true)}
-        />
-      )}
-
       {/* Privacy Policy Modal */}
       {showPrivacyPolicy && (
         <PrivacyPolicyModal onClose={() => setShowPrivacyPolicy(false)} />
@@ -450,24 +427,11 @@ export default function App() {
         <ShareAppModal onClose={() => setShowShareAppModal(false)} />
       )}
 
-      {/* AdMob & AdSense Unit IDs Manager Modal */}
-      {showAdSettings && (
-        <AdSettingsModal
-          adConfig={adConfig}
-          onUpdateConfig={updateAdConfig}
-          onResetToTestIds={resetToTestIds}
-          onTriggerInterstitialTest={showInterstitial}
-          onTriggerRewardedTest={() => showRewarded()}
-          onClose={() => setShowAdSettings(false)}
-        />
-      )}
-
       {/* Fullscreen Interstitial Ad Modal */}
       {isInterstitialOpen && (
         <InterstitialAdModal
           adConfig={adConfig}
           onClose={closeInterstitial}
-          onOpenSettings={() => setShowAdSettings(true)}
         />
       )}
 
@@ -488,18 +452,10 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="mt-auto py-6 border-t border-slate-800/80 bg-slate-950/60 text-center text-xs text-slate-400">
+      <footer className="mt-auto py-6 pb-20 sm:pb-6 border-t border-slate-800/80 bg-slate-950/60 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>© 2026 चुटकुले &amp; विचार (Chutkule &amp; Vichar) • 100% Safe &amp; Family Friendly</p>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs">
-            <button
-              onClick={() => setShowAdSettings(true)}
-              className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 transition"
-              title="Google AdMob Unit ID Manager"
-            >
-              <span>📢</span>
-              <span>AdMob Ads (टेस्ट आईडी)</span>
-            </button>
             <button
               onClick={() => setShowShareAppModal(true)}
               className="hover:text-indigo-400 font-semibold flex items-center gap-1 transition"
@@ -511,12 +467,6 @@ export default function App() {
               className="hover:text-amber-400 underline transition"
             >
               गोपनीयता नीति (Privacy)
-            </button>
-            <button
-              onClick={() => setShowPlayStoreGuide(true)}
-              className="hover:text-emerald-400 underline transition"
-            >
-              Play Store गाइड
             </button>
           </div>
         </div>

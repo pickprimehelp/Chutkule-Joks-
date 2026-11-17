@@ -73,6 +73,44 @@ if (fs.existsSync(stringsXml)) {
   fs.writeFileSync(stringsXml, xmlContent, 'utf8');
 }
 
+// 4b. Ensure AndroidManifest.xml has AdMob APPLICATION_ID and required permissions
+const manifestXmlPath = path.join(androidDir, 'app', 'src', 'main', 'AndroidManifest.xml');
+if (fs.existsSync(manifestXmlPath)) {
+  let manifestContent = fs.readFileSync(manifestXmlPath, 'utf8');
+  const admobAppId = 'ca-app-pub-7584087725069099~9245908893';
+
+  if (!manifestContent.includes('android:requestLegacyExternalStorage="true"')) {
+    manifestContent = manifestContent.replace(
+      '<application',
+      '<application\n        android:requestLegacyExternalStorage="true"'
+    );
+  }
+
+  if (!manifestContent.includes('com.google.android.gms.ads.APPLICATION_ID')) {
+    manifestContent = manifestContent.replace(
+      '</application>',
+      `        <meta-data\n            android:name="com.google.android.gms.ads.APPLICATION_ID"\n            android:value="${admobAppId}" />\n    </application>`
+    );
+  }
+
+  if (!manifestContent.includes('com.google.android.gms.permission.AD_ID')) {
+    manifestContent = manifestContent.replace(
+      '</manifest>',
+      `    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n</manifest>`
+    );
+  }
+
+  if (!manifestContent.includes('android.permission.WRITE_EXTERNAL_STORAGE')) {
+    manifestContent = manifestContent.replace(
+      '</manifest>',
+      `    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>`
+    );
+  }
+
+  fs.writeFileSync(manifestXmlPath, manifestContent, 'utf8');
+  console.log('✔ AndroidManifest.xml verified with AdMob App ID & storage permissions.');
+}
+
 // 5. Ensure gradlew is executable
 const gradlewPath = path.join(androidDir, 'gradlew');
 if (fs.existsSync(gradlewPath)) {

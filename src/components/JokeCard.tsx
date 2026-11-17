@@ -104,6 +104,9 @@ export const JokeCard: React.FC<JokeCardProps> = ({
         text: item.text,
         hasWatermark: true,
         categoryName: category.hindiName,
+        savedPath: result.savedPath,
+        savedUri: result.savedUri,
+        autoDownloaded: result.success,
       });
     }
 
@@ -132,6 +135,9 @@ export const JokeCard: React.FC<JokeCardProps> = ({
             text: item.text,
             hasWatermark: false,
             categoryName: category.hindiName,
+            savedPath: result.savedPath,
+            savedUri: result.savedUri,
+            autoDownloaded: result.success,
           });
         }
 

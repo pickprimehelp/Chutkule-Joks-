@@ -87,6 +87,9 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
         text: item.text,
         hasWatermark: true,
         categoryName: category.hindiName,
+        savedPath: result.savedPath,
+        savedUri: result.savedUri,
+        autoDownloaded: result.success,
       });
     }
 
@@ -115,6 +118,9 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
             text: item.text,
             hasWatermark: false,
             categoryName: category.hindiName,
+            savedPath: result.savedPath,
+            savedUri: result.savedUri,
+            autoDownloaded: result.success,
           });
         }
 

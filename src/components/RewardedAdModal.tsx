@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award, CheckCircle2, Clock, Sparkles } from 'lucide-react';
+import { X, Award, CheckCircle2, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AdConfig } from '../hooks/useAds';
 
@@ -11,7 +11,6 @@ interface RewardedAdModalProps {
 }
 
 export const RewardedAdModal: React.FC<RewardedAdModalProps> = ({
-  adConfig,
   onClose,
   title = '🎬 वॉटरमार्क हटाने के लिए रिवॉर्ड विज्ञापन',
   subtitle = 'पूरा विज्ञापन देखकर बिना वॉटरमार्क वाली HD फोटो अनलॉक करें',
@@ -37,16 +36,11 @@ export const RewardedAdModal: React.FC<RewardedAdModalProps> = ({
     }
   }, [secondsRemaining]);
 
-  const isTest = adConfig.testMode;
-  const currentRewardedId = isTest
-    ? 'ca-app-pub-3940256099942544/5224354917'
-    : adConfig.rewardedId || 'ca-app-pub-3940256099942544/5224354917';
-
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Google AdMob Rewarded Ad"
+      aria-label="रिवॉर्ड विज्ञापन"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in"
     >
       <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl text-slate-100 overflow-hidden flex flex-col">
@@ -54,7 +48,7 @@ export const RewardedAdModal: React.FC<RewardedAdModalProps> = ({
         <div className="p-3.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-slate-950 uppercase tracking-wider">
-              {isTest ? 'Google Test Ad' : 'AdMob Rewarded'}
+              Ad
             </span>
             <span className="text-xs text-amber-300 font-semibold flex items-center gap-1">
               <Award className="w-3.5 h-3.5" />
@@ -94,15 +88,6 @@ export const RewardedAdModal: React.FC<RewardedAdModalProps> = ({
                 ? 'बधाई हो! वॉटरमार्क सफलतापूर्वक हटा दिया गया है!'
                 : subtitle}
             </p>
-          </div>
-
-          {/* Ad Unit Details */}
-          <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-left font-mono text-xs">
-            <p className="text-[10px] text-slate-400 font-sans mb-0.5 flex items-center justify-between">
-              <span>Google AdMob Rewarded Unit:</span>
-              <span className="text-emerald-400">{isTest ? 'Test Mode' : 'Live'}</span>
-            </p>
-            <code className="text-emerald-400 break-all text-[11px]">{currentRewardedId}</code>
           </div>
 
           <button

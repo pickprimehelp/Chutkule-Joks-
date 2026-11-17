@@ -13,7 +13,13 @@ import {
   Award,
   CheckCircle2,
 } from 'lucide-react';
-import { shareImageToWhatsApp, downloadImageBlob, dataUrlToBlob } from '../utils/shareUtils';
+import {
+  shareImageToWhatsApp,
+  downloadOrSaveImageFile,
+  shareImageToGalleryNativeOrWeb,
+  dataUrlToBlob,
+} from '../utils/shareUtils';
+import { drawRoundRect } from '../utils/generateCardImage';
 
 interface CardImageModalProps {
   item: Item;
@@ -200,16 +206,14 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
     ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
     ctx.shadowBlur = 45;
-    ctx.beginPath();
-    ctx.roundRect(margin, margin, cardW, cardH, 44);
+    drawRoundRect(ctx, margin, margin, cardW, cardH, 44);
     ctx.fill();
     ctx.restore();
 
     // Glowing border outline
     ctx.strokeStyle = activeTheme.borderGlow;
     ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.roundRect(margin, margin, cardW, cardH, 44);
+    drawRoundRect(ctx, margin, margin, cardW, cardH, 44);
     ctx.stroke();
 
     // 3. Category Header Badge
@@ -291,8 +295,7 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
       const wmBoxY = height - margin - 75;
       ctx.save();
       ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
-      ctx.beginPath();
-      ctx.roundRect(width / 2 - 290, wmBoxY - 30, 580, 60, 30);
+      drawRoundRect(ctx, width / 2 - 290, wmBoxY - 30, 580, 60, 30);
       ctx.fill();
       ctx.restore();
 
@@ -307,8 +310,8 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
     drawCard();
   }, [drawCard]);
 
-  // Download Action
-  const executeDownload = () => {
+  // Download Action (Web synchronous + Native Android Documents save)
+  const executeDownload = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     setIsExporting(true);
@@ -317,9 +320,17 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
       const blob = dataUrlToBlob(dataUrl);
       const tag = hasUnlockedWatermark ? 'clean' : 'watermark';
       const filename = `chutkule-${category.id}-${tag}-${Date.now()}.png`;
-      downloadImageBlob(blob, filename);
+      const result = await downloadOrSaveImageFile(blob, filename, dataUrl);
       setIsExporting(false);
-      showToast(hasUnlockedWatermark ? '✅ बिना वॉटरमार्क फोटो गैलरी में सेव हो गई!' : '✅ फोटो गैलरी में सेव हो गई!');
+      if (result.savedPath) {
+        showToast(`✅ फ़ाइल सेव हुई: ${result.savedPath}`);
+      } else {
+        showToast(
+          hasUnlockedWatermark
+            ? '✅ बिना वॉटरमार्क फोटो गैलरी में सेव हो गई!'
+            : '✅ फोटो गैलरी में सेव हो गई!'
+        );
+      }
     } catch {
       setIsExporting(false);
     }
@@ -336,7 +347,7 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
       const blob = dataUrlToBlob(dataUrl);
       const tag = hasUnlockedWatermark ? 'clean' : 'watermark';
       const filename = `chutkule-${category.id}-${tag}-${Date.now()}.png`;
-      const result = await shareImageToWhatsApp(blob, item.text, filename);
+      const result = await shareImageToWhatsApp(blob, item.text, filename, dataUrl);
       setIsExporting(false);
 
       if (result.method === 'download_and_whatsapp') {
@@ -349,32 +360,33 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
     }
   };
 
-  // Native Generic Share Action
-  const executeGenericShare = () => {
+  // Native Generic Share / Save to Gallery Action
+  const executeGenericShare = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     setIsExporting(true);
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const blob = dataUrlToBlob(dataUrl);
       const tag = hasUnlockedWatermark ? 'clean' : 'watermark';
       const filename = `chutkule-${category.id}-${tag}-${Date.now()}.png`;
-      const file = new File([blob], filename, { type: 'image/png' });
-
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: `${category.hindiName} - चुटकुले और विचार`,
-          });
-        } catch {
-          // ignore cancel
-        }
-      } else {
-        executeDownload();
+      const res = await shareImageToGalleryNativeOrWeb(
+        blob,
+        filename,
+        `${category.hindiName} - चुटकुले और विचार`,
+        dataUrl
+      );
+      if (res === 'downloaded') {
+        showToast('✅ फोटो गैलरी / Downloads में सेव हो गई!');
+      } else if (res === 'shared') {
+        showToast('✅ शेयर विकल्प खुल गए!');
       }
+    } catch {
+      // ignore
+    } finally {
       setIsExporting(false);
-    }, 'image/png');
+    }
   };
 
   return (
