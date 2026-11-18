@@ -167,9 +167,17 @@ jobs:
 
       - name: 📝 Output Download Guide in Summary
         run: |
+          RELEASE_TAG="v1.0.${{ github.run_number }}"
+          RELEASE_BASE="https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}"
           echo "## 🎉 Android APK & AAB Build Successful!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Artifacts (नीचे 'Artifacts' सेक्शन में डाउनलोड करें):" >> $GITHUB_STEP_SUMMARY
+          echo "### ⬇️ Direct Download Links (लॉग-इन के बिना भी तुरंत डाउनलोड करें):" >> $GITHUB_STEP_SUMMARY
+          echo "- 📱 **[Release APK डाउनलोड करें (फ़ोन में इंस्टॉल करें)](${RELEASE_BASE}/Chutkule-Vichar-Release.apk)**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🛠️ **[Debug APK डाउनलोड करें](${RELEASE_BASE}/Chutkule-Vichar-Debug.apk)**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏪 **[Play Store AAB बंडल डाउनलोड करें](${RELEASE_BASE}/Chutkule-Vichar-PlayStore.aab)**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 **[सभी रिलीज़ देखें (Releases Page)](https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG})**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts (नीचे 'Artifacts' सेक्शन — डाउनलोड के लिए GitHub लॉग-इन ज़रूरी है):" >> $GITHUB_STEP_SUMMARY
           echo "- **Chutkule-Vichar-Release-APK**: फ़ोन में डायरेक्ट इंस्टॉल करने के लिए Signed Release APK" >> $GITHUB_STEP_SUMMARY
           echo "- **Chutkule-Vichar-Debug-APK**: टेस्टिंग के लिए Debug APK" >> $GITHUB_STEP_SUMMARY
           echo "- **Chutkule-Vichar-PlayStore-AAB**: Google Play Store पर अपलोड करने के लिए AAB बंडल" >> $GITHUB_STEP_SUMMARY
