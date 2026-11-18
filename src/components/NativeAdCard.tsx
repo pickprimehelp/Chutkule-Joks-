@@ -50,18 +50,21 @@ export const NativeAdCard: React.FC<NativeAdCardProps> = ({
     return (
       <article
         aria-label="Sponsored Native Ad"
-        className="relative flex flex-col justify-between p-3 rounded-3xl bg-slate-900/90 [body.light_&]:bg-white [body.amoled_&]:bg-neutral-950 border border-slate-700/60 [body.light_&]:border-slate-200 shadow-xl overflow-hidden min-h-[320px]"
+        className="relative my-2 flex flex-col justify-between p-4 rounded-3xl bg-slate-900/95 [body.light_&]:bg-white [body.amoled_&]:bg-neutral-950 border-2 border-amber-500/30 [body.light_&]:border-amber-300/70 shadow-xl overflow-hidden min-h-[330px]"
       >
-        <div className="flex items-center gap-1.5 mb-2 px-1">
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300 [body.light_&]:text-amber-700 border border-amber-500/30 uppercase tracking-wider">
-            Ad
-          </span>
-          <span className="text-[11px] text-slate-400 font-medium">प्रायोजित विज्ञापन</span>
+        <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800/80 [body.light_&]:border-slate-200 px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-slate-950 uppercase tracking-wider">
+              Ad
+            </span>
+            <span className="text-[11px] text-slate-400 font-medium">प्रायोजित विज्ञापन</span>
+          </div>
+          <span className="text-[10px] text-slate-500">Sponsored</span>
         </div>
 
         <div
           ref={nativeContainerRef}
-          className="w-full flex-1 min-h-[280px] rounded-2xl overflow-hidden"
+          className="w-full flex-1 min-h-[270px] rounded-2xl overflow-hidden"
         />
 
         {!nativeLoaded && (

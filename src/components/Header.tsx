@@ -63,11 +63,11 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-2 cursor-pointer select-none min-w-0 flex-shrink"
             onClick={() => isFavoritesView && onOpenFavorites()}
           >
-            <div
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex-shrink-0 flex items-center justify-center text-lg sm:text-xl shadow-lg shadow-${currentCategory.baseColor}-500/20 bg-gradient-to-tr ${currentCategory.gradient} text-white transform hover:scale-105 active:scale-95 transition-transform`}
-            >
-              {currentCategory.icon}
-            </div>
+            <img
+              src="/assets/aistudio/pwa-512x512_618dd407.png"
+              alt="चुटकुले & विचार लोगो"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex-shrink-0 object-cover shadow-lg transform hover:scale-105 active:scale-95 transition-transform"
+            />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-sm sm:text-lg tracking-tight [body.light_&]:text-slate-900 text-white truncate block">

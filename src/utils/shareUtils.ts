@@ -290,18 +290,18 @@ export function openWhatsAppDirect(text: string): void {
 }
 
 /**
- * Shares an image file to WhatsApp / Social Media
- * 1. Native Android APK (Capacitor): writes PNG to Cache & attaches via `files: [uri]`
- * 2. Mobile Chrome / Safari: Web Share API with `files: [File]`
- * 3. Desktop / Web fallback: downloads PNG card synchronously + opens WhatsApp
+ * Shares ONLY the card image file to WhatsApp / Social Media (no text attached)
+ * 1. Native Android APK (Capacitor): writes PNG to Cache & attaches via `files: [uri]` with no text
+ * 2. Mobile Chrome / Safari: Web Share API with `files: [File]` only (no text/title)
+ * 3. Desktop / Web fallback: downloads PNG card cleanly so user can attach only the image
  */
 export async function shareImageToWhatsApp(
   blob: Blob,
-  text: string,
+  _text: string,
   filename: string = 'chutkule-status.png',
   dataUrlHint?: string
-): Promise<{ method: 'native' | 'download_and_whatsapp'; success: boolean; dataUrl?: string }> {
-  // 1. Native Capacitor Platform (Android APK)
+): Promise<{ method: 'native' | 'download_only'; success: boolean; dataUrl?: string }> {
+  // 1. Native Capacitor Platform (Android APK) - Image ONLY
   if (Capacitor.isNativePlatform()) {
     try {
       const base64Data = extractBase64FromDataUrl(dataUrlHint) || (await blobToBase64(blob));
@@ -312,10 +312,8 @@ export async function shareImageToWhatsApp(
       });
 
       await Share.share({
-        title: 'चुटकुले और विचार',
-        text: `${text}\n\n📲 ऐप: चुटकुले और विचार`,
         files: [savedFile.uri],
-        dialogTitle: 'WhatsApp स्टेटस या चैट में शेयर करें',
+        dialogTitle: 'WhatsApp पर फोटो कार्ड शेयर करें',
       });
 
       return { method: 'native', success: true, dataUrl: dataUrlHint };
@@ -323,35 +321,32 @@ export async function shareImageToWhatsApp(
       if (err?.name === 'AbortError' || err?.message?.includes('cancel')) {
         return { method: 'native', success: false, dataUrl: dataUrlHint };
       }
-      console.warn('Native Capacitor share failed, continuing with fallback', err);
+      console.warn('Native Capacitor share failed, continuing with download fallback', err);
     }
   }
 
-  // 2. Web Share API with file support (Mobile Chrome / Safari)
+  // 2. Web Share API with file support (Mobile Chrome / Safari) - Image ONLY
   try {
     const file = new File([blob], filename, { type: 'image/png' });
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
           files: [file],
-          title: 'चुटकुले और विचार',
-          text: `${text}\n\n📲 ऐप: चुटकुले और विचार`,
         });
         return { method: 'native', success: true, dataUrl: dataUrlHint };
       } catch (err: any) {
         if (err.name === 'AbortError') {
           return { method: 'native', success: false, dataUrl: dataUrlHint };
         }
-        console.warn('Navigator.share error, falling through to download + WhatsApp redirect', err);
+        console.warn('Navigator.share error, falling through to image download', err);
       }
     }
   } catch (err) {
     console.warn('File share check failed', err);
   }
 
-  // 3. Reliable Web Fallback:
+  // 3. Desktop / Unsupported Web Fallback: Download PNG image ONLY (never open WhatsApp with text)
   downloadImageBlob(blob, filename);
-  openWhatsAppDirect(`${text}\n\n📲 फोटो कार्ड गैलरी में सेव हो गया है!`);
 
-  return { method: 'download_and_whatsapp', success: true, dataUrl: dataUrlHint };
+  return { method: 'download_only', success: true, dataUrl: dataUrlHint };
 }

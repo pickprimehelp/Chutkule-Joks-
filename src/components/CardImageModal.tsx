@@ -350,9 +350,9 @@ export const CardImageModal: React.FC<CardImageModalProps> = ({
       const result = await shareImageToWhatsApp(blob, item.text, filename, dataUrl);
       setIsExporting(false);
 
-      if (result.method === 'download_and_whatsapp') {
-        showToast('✅ फोटो सेव हो गई! WhatsApp खुल रहा है...');
-      } else {
+      if (result.method === 'download_only') {
+        showToast('✅ फोटो सेव हो गई! केवल इमेज भेजने के लिए WhatsApp में अटैच करें');
+      } else if (result.success) {
         showToast('✅ WhatsApp पर शेयर करें!');
       }
     } catch {

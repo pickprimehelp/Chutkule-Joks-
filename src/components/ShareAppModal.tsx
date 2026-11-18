@@ -54,9 +54,11 @@ export const ShareAppModal: React.FC<ShareAppModalProps> = ({ onClose }) => {
 
         {/* Modal Header */}
         <div className="text-center mb-5">
-          <div className="w-14 h-14 mx-auto mb-2.5 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-3xl shadow-lg shadow-orange-500/25 text-white">
-            😂
-          </div>
+          <img
+            src="/assets/aistudio/pwa-512x512_618dd407.png"
+            alt="चुटकुले & विचार लोगो"
+            className="w-16 h-16 mx-auto mb-2.5 rounded-2xl object-cover shadow-lg shadow-pink-500/25"
+          />
           <h3 className="text-xl font-extrabold text-white">
             ऐप दोस्तों के साथ शेयर करें
           </h3>
@@ -67,9 +69,11 @@ export const ShareAppModal: React.FC<ShareAppModalProps> = ({ onClose }) => {
 
         {/* App Mini Preview Card */}
         <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80 mb-5 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-2xl flex-shrink-0 text-white shadow-md">
-            ✨
-          </div>
+          <img
+            src="/assets/aistudio/pwa-512x512_618dd407.png"
+            alt="चुटकुले & विचार"
+            className="w-12 h-12 rounded-xl object-cover flex-shrink-0 shadow-md"
+          />
           <div className="overflow-hidden">
             <h4 className="text-sm font-bold text-white truncate">चुटकुले &amp; विचार (Hub)</h4>
             <p className="text-xs text-amber-400 font-semibold">1000+ चुटकुले • कोट्स • स्टेटस</p>

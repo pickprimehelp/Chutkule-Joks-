@@ -29,13 +29,19 @@ export const ADMOB_CONFIG: AdConfig = {
   interstitialId: 'ca-app-pub-7584087725069099/6779527659',
   nativeId: 'ca-app-pub-7584087725069099/6738318569',
   rewardedId: 'ca-app-pub-7584087725069099/2840282642',
-  bannerFrequency: 6,
-  interstitialFrequency: 8,
-  cooldownSeconds: 180,
+  bannerFrequency: 18,
+  interstitialFrequency: 15,
+  cooldownSeconds: 300, // 5-minute strict cooldown between interstitials
 };
 
 const LAST_INTERSTITIAL_KEY = 'chutkule_last_interstitial_ts';
 const LAST_REWARDED_KEY = 'chutkule_last_rewarded_ts';
+const DAILY_INTERSTITIAL_KEY = 'chutkule_daily_interstitial_count';
+
+// AdMob Invalid Activity & Policy Protection Thresholds
+const MAX_DAILY_INTERSTITIALS = 3;
+const MIN_SESSION_AGE_MS = 45000; // Wait at least 45s after app open before any interstitial
+const POST_REWARD_COOLDOWN_MS = 300000; // 5-minute gap after rewarded ad
 
 let sharedNativeAdFeed: NativeAdFeed | null = null;
 let sharedNativeFeedPromise: Promise<NativeAdFeed | null> | null = null;
@@ -66,6 +72,37 @@ export async function getSharedNativeAdFeed(nativeAdId: string): Promise<NativeA
   return sharedNativeFeedPromise;
 }
 
+function getTodayDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function getDailyInterstitialCount(): number {
+  try {
+    const raw = localStorage.getItem(DAILY_INTERSTITIAL_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw);
+    if (parsed.date === getTodayDateString()) {
+      return Number(parsed.count) || 0;
+    }
+  } catch {
+    // ignore
+  }
+  return 0;
+}
+
+function incrementDailyInterstitialCount(): void {
+  try {
+    const current = getDailyInterstitialCount();
+    localStorage.setItem(
+      DAILY_INTERSTITIAL_KEY,
+      JSON.stringify({ date: getTodayDateString(), count: current + 1 })
+    );
+  } catch {
+    // ignore
+  }
+}
+
 export function useAds() {
   const adConfig = ADMOB_CONFIG;
 
@@ -78,6 +115,9 @@ export function useAds() {
   const interstitialReadyRef = useRef(false);
   const rewardedReadyRef = useRef(false);
   const initializedRef = useRef(false);
+  const appStartTimeRef = useRef(Date.now());
+  const isShowingInterstitialRef = useRef(false);
+  const isShowingRewardedRef = useRef(false);
 
   const preloadNativeInterstitial = useCallback(async () => {
     if (!Capacitor.isNativePlatform() || !adConfig.adsEnabled) return;
@@ -118,21 +158,23 @@ export function useAds() {
           initializeForTesting: false,
         });
 
-        // 1. Show Adaptive Bottom Banner Ad
+        // 1. Show Adaptive Bottom Banner Ad cleanly at bottom
         await AdMob.showBanner({
           adId: adConfig.bannerId,
           adSize: BannerAdSize.ADAPTIVE_BANNER,
           position: BannerAdPosition.BOTTOM_CENTER,
+          margin: 0,
           isTesting: false,
         });
 
-        // 2. Listen for Interstitial Dismiss to preload next
+        // 2. Listen for Interstitial Dismiss to reset lock & preload next
         await AdMob.addListener(InterstitialAdPluginEvents.Dismissed, () => {
+          isShowingInterstitialRef.current = false;
           interstitialReadyRef.current = false;
           preloadNativeInterstitial();
         });
 
-        // 3. Preload Interstitial & Rewarded Ads
+        // 3. Preload Interstitial & Rewarded Ads gently
         preloadNativeInterstitial();
         preloadNativeRewarded();
       } catch (err) {
@@ -144,15 +186,28 @@ export function useAds() {
   }, [isNative, adConfig.adsEnabled, adConfig.bannerId, preloadNativeInterstitial, preloadNativeRewarded]);
 
   /**
-   * Safe Interstitial Trigger with Frequency Capping & Cooldown Protection
+   * Policy-Safe Interstitial Trigger:
+   * - 45s initial warmup after app start
+   * - 5-minute strict cooldown between interstitials
+   * - 5-minute cooldown after any rewarded ad
+   * - Max 3 interstitials per day to prevent invalid activity
+   * - In-flight lock to prevent duplicate triggers
    */
   const showInterstitial = useCallback(
     async (force: boolean = false) => {
       if (!adConfig.adsEnabled) return false;
+      if (isShowingInterstitialRef.current || isShowingRewardedRef.current) return false;
 
       const now = Date.now();
-      const cooldownMs = (adConfig.cooldownSeconds || 180) * 1000;
+      if (!force && now - appStartTimeRef.current < MIN_SESSION_AGE_MS) {
+        return false;
+      }
 
+      if (!force && getDailyInterstitialCount() >= MAX_DAILY_INTERSTITIALS) {
+        return false;
+      }
+
+      const cooldownMs = (adConfig.cooldownSeconds || 300) * 1000;
       let lastShown = 0;
       let lastRewarded = 0;
       try {
@@ -164,11 +219,13 @@ export function useAds() {
 
       if (!force) {
         if (now - lastShown < cooldownMs) return false;
-        if (now - lastRewarded < 240000) return false;
+        if (now - lastRewarded < POST_REWARD_COOLDOWN_MS) return false;
       }
 
+      isShowingInterstitialRef.current = true;
       try {
         localStorage.setItem(LAST_INTERSTITIAL_KEY, String(now));
+        incrementDailyInterstitialCount();
       } catch {
         // ignore
       }
@@ -184,7 +241,7 @@ export function useAds() {
             return true;
           }
         } catch {
-          // Fallback to web interstitial modal below
+          isShowingInterstitialRef.current = false;
         }
       }
 
@@ -195,24 +252,24 @@ export function useAds() {
   );
 
   /**
-   * Action tracker (called on share/download)
+   * Action tracker (called on intentional designer open — spaced conservatively at every 15 actions)
    */
   const trackShareAction = useCallback(() => {
     setShareCount((prev) => {
       const next = prev + 1;
-      const freq = Math.max(adConfig.interstitialFrequency || 8, 6);
+      const freq = Math.max(adConfig.interstitialFrequency || 15, 12);
 
       if (adConfig.adsEnabled && next % freq === 0) {
         setTimeout(() => {
           showInterstitial(false);
-        }, 1200);
+        }, 1500);
       }
       return next;
     });
   }, [adConfig.adsEnabled, adConfig.interstitialFrequency, showInterstitial]);
 
   /**
-   * Trigger Rewarded Ad (per-action basis: watches video ad to unlock that single clean export)
+   * User-Initiated Rewarded Ad (strictly opt-in, double-tap guarded)
    */
   const showRewarded = useCallback(
     async (onRewardSuccess?: () => void) => {
@@ -220,6 +277,9 @@ export function useAds() {
         if (onRewardSuccess) onRewardSuccess();
         return;
       }
+
+      if (isShowingRewardedRef.current) return;
+      isShowingRewardedRef.current = true;
 
       if (Capacitor.isNativePlatform()) {
         try {
@@ -236,6 +296,7 @@ export function useAds() {
               rewardHandle.remove();
               dismissHandle.remove();
               rewardedReadyRef.current = false;
+              isShowingRewardedRef.current = false;
               preloadNativeRewarded();
 
               if (earned) {
@@ -253,7 +314,7 @@ export function useAds() {
             return;
           }
         } catch {
-          // Fallback to web rewarded modal if native video failed to load
+          // Fall through to web modal cleanly
         }
       }
 
@@ -266,11 +327,13 @@ export function useAds() {
   );
 
   const closeInterstitial = useCallback(() => {
+    isShowingInterstitialRef.current = false;
     setIsInterstitialOpen(false);
   }, []);
 
   const closeRewarded = useCallback(
     (rewardGranted: boolean) => {
+      isShowingRewardedRef.current = false;
       setIsRewardedOpen(false);
       if (rewardGranted) {
         const now = Date.now();

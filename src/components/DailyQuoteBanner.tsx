@@ -65,9 +65,9 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
     }
 
     if (result.downloadedFallback) {
-      setShareStatus('✅ कार्ड तैयार! WhatsApp व डाउनलोड उपलब्ध');
+      setShareStatus('✅ कार्ड डाउनलोड हो गया! WhatsApp में केवल फोटो चुनकर भेजें');
     } else if (result.success) {
-      setShareStatus('✅ WhatsApp पर शेयर करें!');
+      setShareStatus('✅ केवल फोटो WhatsApp पर शेयर करें!');
     }
     setTimeout(() => setShareStatus(null), 3000);
   };
@@ -157,9 +157,9 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
         }
 
         if (result.downloadedFallback) {
-          setShareStatus('✅ HD कार्ड तैयार! WhatsApp व डाउनलोड उपलब्ध');
+          setShareStatus('✅ HD कार्ड डाउनलोड हो गया! WhatsApp में केवल फोटो चुनकर भेजें');
         } else if (result.success) {
-          setShareStatus('✅ WhatsApp पर शेयर करें!');
+          setShareStatus('✅ केवल फोटो WhatsApp पर शेयर करें!');
         }
         setTimeout(() => setShareStatus(null), 3000);
       });

@@ -275,7 +275,7 @@ export async function shareCardDirectly(
     );
     return {
       success: result.success,
-      downloadedFallback: result.method === 'download_and_whatsapp',
+      downloadedFallback: result.method === 'download_only',
       dataUrl: cardData.dataUrl,
       filename: cardData.filename,
       blob: cardData.blob,

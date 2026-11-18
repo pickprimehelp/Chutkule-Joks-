@@ -160,7 +160,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-24">
         {/* Category Bar with dynamic theme highlights */}
         <CategoryBar
           selectedCategoryId={selectedCategoryId}
@@ -280,8 +280,8 @@ export default function App() {
                 const itemCat =
                   CATEGORIES.find((c) => c.id === item.categoryId) || currentCategory;
 
-                // Inject a Native Ad Card at position 4 and position 10 in the feed
-                const showNativeAdHere = index === 3 || index === 9;
+                // Inject Native Ad conservatively (only after 8 items, then every 18 items)
+                const showNativeAdHere = index === 7 || (index > 7 && (index - 7) % 18 === 0);
 
                 return (
                   <React.Fragment key={item.id}>
@@ -352,10 +352,10 @@ export default function App() {
         </div>
       </main>
 
-      {/* Floating Scroll to Top */}
+      {/* Floating Scroll to Top (positioned safely clear of bottom AdMob banner) */}
       <button
         onClick={handleScrollToTop}
-        className="fixed bottom-6 right-6 z-30 p-3 rounded-full bg-slate-800 [body.light_&]:bg-white text-white [body.light_&]:text-slate-900 border border-slate-700 [body.light_&]:border-slate-300 shadow-xl hover:scale-110 transition"
+        className="fixed bottom-20 right-4 z-30 p-3 rounded-full bg-slate-800 [body.light_&]:bg-white text-white [body.light_&]:text-slate-900 border border-slate-700 [body.light_&]:border-slate-300 shadow-xl hover:scale-110 transition"
         title="Scroll to top"
       >
         <ArrowUp className="w-5 h-5" />
@@ -451,8 +451,8 @@ export default function App() {
         />
       )}
 
-      {/* Footer */}
-      <footer className="mt-auto py-6 pb-20 sm:pb-6 border-t border-slate-800/80 bg-slate-950/60 text-center text-xs text-slate-400">
+      {/* Footer (padded bottom so bottom banner ad never overlaps links) */}
+      <footer className="mt-auto py-6 pb-24 border-t border-slate-800/80 bg-slate-950/60 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>© 2026 चुटकुले &amp; विचार (Chutkule &amp; Vichar) • 100% Safe &amp; Family Friendly</p>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs">
