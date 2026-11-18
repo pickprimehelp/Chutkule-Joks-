@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-android:
     name: 📱 Build Android APK & AAB (Play Store Ready)
@@ -23,27 +26,24 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: 🤖 Set up Android SDK & Accept Licenses
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0 platform-tools'
+
       - name: 🟢 Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: 📱 Accept Android SDK Licenses & Install Platform 36
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
-          yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses 2>/dev/null || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" 2>/dev/null || true
-
       - name: 🐘 Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: 📦 Install Node Dependencies
-        run: |
-          npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: 🔨 Build Web Frontend
-        run: |
-          npm run build
+        run: npm run build
 
       - name: 🔄 Prepare & Sync Android Assets (Capacitor)
         run: |
@@ -51,16 +51,11 @@ jobs:
             node scripts/prepare-android.js
           else
             if [ ! -d "android" ]; then
-              echo "Android directory not found. Initializing Capacitor Android..."
               npx cap add android
             fi
-            echo "Syncing Capacitor assets..."
             npx cap sync android
           fi
-          
-          if [ -f "android/gradlew" ]; then
-            chmod +x android/gradlew
-          fi
+          chmod +x android/gradlew
 
       - name: 🔑 Configure Release Keystore
         env:
@@ -74,7 +69,8 @@ jobs:
             echo "Decoding Keystore from GitHub Secrets..."
             echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
           else
-            echo "Generating automated release signing key..."
+            echo "Generating release signing key..."
+            rm -f android/app/release.jks
             keytool -genkeypair -v \
               -keystore android/app/release.jks \
               -alias "$KEY_ALIAS" \
@@ -85,69 +81,96 @@ jobs:
               -keypass "$KEY_PASSWORD" \
               -dname "CN=ChutkuleApp, OU=Mobile, O=Chutkule, L=Delhi, S=Delhi, C=IN"
           fi
-          echo "Keystore ready at android/app/release.jks"
+          ls -lh android/app/release.jks
 
-      - name: 🚀 Build APK & AAB with Gradle
+      - name: 🚀 Build Debug APK, Release APK & Play Store AAB
         env:
           KEYSTORE_PATH: "release.jks"
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'chutkule123' }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'chutkule' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'chutkule123' }}
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -Dorg.gradle.daemon=false"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m -Dorg.gradle.daemon=false"
         run: |
           cd android
           chmod +x gradlew
-          
-          echo "1. Building Debug APK (Install directly on phone)..."
-          ./gradlew assembleDebug --stacktrace || true
-          
-          echo "2. Building Release APK..."
-          ./gradlew assembleRelease --stacktrace || true
-          
-          echo "3. Building Release AAB Bundle (Play Store format)..."
-          ./gradlew bundleRelease --stacktrace || true
-          
-          cd ..
+          ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace --no-daemon
 
-      - name: 📂 Organize Artifacts
-        if: always()
+      - name: 📂 Collect & Verify APK and AAB Outputs
         run: |
+          rm -rf android-artifacts
           mkdir -p android-artifacts
-          
-          # Find and copy all generated APKs
-          find android/app/build/outputs/apk -name "*.apk" -exec cp {} android-artifacts/ \; 2>/dev/null || true
-          
-          # Find and copy all generated AAB bundles
-          find android/app/build/outputs/bundle -name "*.aab" -exec cp {} android-artifacts/ \; 2>/dev/null || true
-          
-          # Copy Keystore file
+
+          DEBUG_APK=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          RELEASE_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          RELEASE_AAB=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -n 1)
+
+          if [ -n "$DEBUG_APK" ]; then cp "$DEBUG_APK" android-artifacts/Chutkule-Vichar-Debug.apk; fi
+          if [ -n "$RELEASE_APK" ]; then cp "$RELEASE_APK" android-artifacts/Chutkule-Vichar-Release.apk; fi
+          if [ -n "$RELEASE_AAB" ]; then cp "$RELEASE_AAB" android-artifacts/Chutkule-Vichar-PlayStore.aab; fi
+
           if [ -f android/app/release.jks ]; then
             cp android/app/release.jks android-artifacts/chutkule-release.jks
           fi
-          
-          echo "=== Found Artifacts ==="
-          ls -lh android-artifacts/ || true
 
-      - name: 📤 Upload APK & AAB Artifacts
+          echo "=== Verified Build Artifacts ==="
+          ls -lh android-artifacts/
+
+          test -s android-artifacts/Chutkule-Vichar-Debug.apk
+          test -s android-artifacts/Chutkule-Vichar-Release.apk
+          test -s android-artifacts/Chutkule-Vichar-PlayStore.aab
+
+      - name: 📤 Upload All Build Artifacts (ZIP)
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: Chutkule-Vichar-Android-APK-AAB
           path: android-artifacts/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
-      - name: 📝 Output GitHub Step Summary
-        if: always()
+      - name: 📱 Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutkule-Vichar-Debug-APK
+          path: android-artifacts/Chutkule-Vichar-Debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🚀 Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutkule-Vichar-Release-APK
+          path: android-artifacts/Chutkule-Vichar-Release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🏪 Upload Play Store AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutkule-Vichar-PlayStore-AAB
+          path: android-artifacts/Chutkule-Vichar-PlayStore.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🏷️ Publish Direct APK & AAB Links on GitHub Releases
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Chutkule & Vichar Android v1.0.${{ github.run_number }}
+          draft: false
+          prerelease: false
+          files: |
+            android-artifacts/Chutkule-Vichar-Debug.apk
+            android-artifacts/Chutkule-Vichar-Release.apk
+            android-artifacts/Chutkule-Vichar-PlayStore.aab
+
+      - name: 📝 Output Download Guide in Summary
         run: |
-          echo "## 🎉 Android APK & AAB Build Run Finished!" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Android APK & AAB Build Successful!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Download Your App Files Above in 'Artifacts':" >> $GITHUB_STEP_SUMMARY
-          echo "- **app-debug.apk / Chutkule-Vichar-debug.apk**: फ़ोन में तुरंत इंस्टॉल करके चलाने के लिए APK।" >> $GITHUB_STEP_SUMMARY
-          echo "- **app-release.apk / app-release-unsigned.apk**: हस्ताक्षरित रिलीज़ APK फ़ाइल।" >> $GITHUB_STEP_SUMMARY
-          echo "- **app-release.aab**: Google Play Store Console के लिए AAB बंडल।" >> $GITHUB_STEP_SUMMARY
-          echo "- **chutkule-release.jks**: ऐप साइनिंग की (सुरक्षित रखें)।" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔑 Keystore Credentials:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Password:** \`chutkule123\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Alias:** \`chutkule\`" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts (नीचे 'Artifacts' सेक्शन में डाउनलोड करें):" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-Release-APK**: फ़ोन में डायरेक्ट इंस्टॉल करने के लिए Signed Release APK" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-Debug-APK**: टेस्टिंग के लिए Debug APK" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-PlayStore-AAB**: Google Play Store पर अपलोड करने के लिए AAB बंडल" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chutkule-Vichar-Android-APK-AAB**: सभी फाइलें + Keystore एक साथ" >> $GITHUB_STEP_SUMMARY
