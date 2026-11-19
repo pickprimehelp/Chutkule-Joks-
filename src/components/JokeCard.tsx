@@ -25,6 +25,7 @@ interface JokeCardProps {
   onOpenCardModal: (item: Item) => void;
   onRequestRewardedAd?: (onSuccess: () => void) => void;
   onShowCardReady?: (data: CardReadyData) => void;
+  onUserAction?: () => void;
 }
 
 export const JokeCard: React.FC<JokeCardProps> = ({
@@ -35,6 +36,7 @@ export const JokeCard: React.FC<JokeCardProps> = ({
   onOpenCardModal,
   onRequestRewardedAd,
   onShowCardReady,
+  onUserAction,
 }) => {
   const [likes, setLikes] = useState(item.likes);
   const [hasLiked, setHasLiked] = useState(false);
@@ -86,6 +88,7 @@ export const JokeCard: React.FC<JokeCardProps> = ({
     } else if (result.success) {
       setShareStatus('✅ केवल फोटो WhatsApp पर शेयर करें!');
     }
+    onUserAction?.();
     setTimeout(() => setShareStatus(null), 3000);
   };
 
@@ -115,6 +118,7 @@ export const JokeCard: React.FC<JokeCardProps> = ({
     } else {
       setShareStatus('✅ फोटो कार्ड तैयार है!');
     }
+    onUserAction?.();
     setTimeout(() => setShareStatus(null), 3500);
   };
 

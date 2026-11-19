@@ -49,11 +49,11 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose 
           </section>
 
           <section>
-            <h4 className="font-bold text-sm text-white mb-1.5">2. डेटा संग्रह और सुरक्षा (Data Collection &amp; Safety)</h4>
+            <h4 className="font-bold text-sm text-white mb-1.5">2. डेटा संग्रह और विज्ञापन (Data Collection &amp; Google AdMob)</h4>
             <ul className="list-disc list-inside space-y-1 ml-1 text-slate-300">
-              <li><strong>कोई व्यक्तिगत डेटा नहीं:</strong> हम आपका नाम, ईमेल, फोन नंबर या कोई भी संवेदनशील जानकारी सर्वर पर सेव नहीं करते।</li>
-              <li><strong>लोकल स्टोरेज (Offline Storage):</strong> आपके द्वारा सेव किए गए पसंदीदा चुटकुले (Favorites) और डार्क मोड केवल आपके ही फोन की मेमोरी में सुरक्षित रहते हैं।</li>
-              <li><strong>कोई ट्रैकिंग नहीं:</strong> ऐप में कोई हानिकारक स्पायवेयर या अनधिकृत बैकग्राउंड ट्रैकिंग कोड नहीं है।</li>
+              <li><strong>कोई व्यक्तिगत डेटा नहीं:</strong> हम आपका नाम, ईमेल, फोन नंबर, कॉन्टैक्ट्स या GPS लोकेशन सर्वर पर सेव नहीं करते।</li>
+              <li><strong>लोकल स्टोरेज (Offline Storage):</strong> आपके पसंदीदा चुटकुले (Favorites) और थीम सेटिंग केवल आपके फोन में सुरक्षित रहती हैं।</li>
+              <li><strong>Google AdMob विज्ञापन:</strong> ऐप को मुफ्त रखने के लिए Google AdMob द्वारा विज्ञापन दिखाए जाते हैं, जो विज्ञापन दिखाने और अमान्य गतिविधि रोकने के लिए डिवाइस की Advertising ID (AD_ID) और बेसिक डायग्नोस्टिक्स का उपयोग कर सकता है।</li>
             </ul>
           </section>
 
@@ -61,7 +61,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose 
             <h4 className="font-bold text-sm text-white mb-1.5">3. आवश्यक अनुमतियाँ (App Permissions)</h4>
             <ul className="list-disc list-inside space-y-1 ml-1 text-slate-300">
               <li><strong>नोटिफिकेशन्स (POST_NOTIFICATIONS):</strong> केवल उपयोगकर्ता की सहमति से दैनिक चुटकुला या विचार भेजने के लिए।</li>
-              <li><strong>इंटरनेट (INTERNET):</strong> ऐप के वेब कंटेंट को लोड करने और सोशल मीडिया पर शेयर करने के लिए।</li>
+              <li><strong>इंटरनेट व स्टोरेज (INTERNET &amp; Storage):</strong> विज्ञापन लोड करने और आपके द्वारा डाउनलोड किए गए PNG फोटो कार्ड को गैलरी/Documents में सेव करने के लिए।</li>
             </ul>
           </section>
 
@@ -75,7 +75,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose 
           <section>
             <h4 className="font-bold text-sm text-white mb-1.5">5. बच्चों की गोपनीयता (Children's Privacy - COPPA / Play Family Policy)</h4>
             <p>
-              यह एप्लिकेशन सभी आयु वर्ग (General Audience / Family Friendly) के लिए उपयुक्त है। इसमें कोई अश्लील, भ्रामक, हिंसात्मक या अनुचित सामग्री नहीं है।
+              यह एप्लिकेशन सामान्य दर्शकों (13+ / General Audience) के लिए उपयुक्त है और इसमें कोई अश्लील, भ्रामक, हिंसात्मक या अनुचित सामग्री नहीं है।
             </p>
           </section>
 
@@ -83,7 +83,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose 
             <h4 className="font-bold text-sm text-white mb-1.5">6. संपर्क (Contact Developer)</h4>
             <p>
               किसी भी प्रश्न, सुझाव या कॉपीराइट संबंधी पूछताछ के लिए आप डेवलपर से संपर्क कर सकते हैं:<br />
-              <strong className="text-amber-400">Email:</strong> support@chutkulevichar.app
+              <strong className="text-amber-400">Email:</strong> manishajhinjhana@gmail.com
             </p>
           </section>
         </div>

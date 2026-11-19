@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Star, Sparkles } from 'lucide-react';
-import { AdConfig, getSharedNativeAdFeed } from '../hooks/useAds';
+import {
+  AdConfig,
+  NativeSlotStatus,
+  getSharedNativeAdFeed,
+  subscribeNativeSlotStatus,
+} from '../hooks/useAds';
 
 interface NativeAdCardProps {
   adConfig: AdConfig;
@@ -13,44 +18,94 @@ export const NativeAdCard: React.FC<NativeAdCardProps> = ({
   slotKey = 'native_slot_default',
 }) => {
   const nativeContainerRef = useRef<HTMLDivElement | null>(null);
-  const [nativeLoaded, setNativeLoaded] = useState(false);
+  const [slotStatus, setSlotStatus] = useState<NativeSlotStatus>('loading');
+  const [permanentlyFailed, setPermanentlyFailed] = useState(false);
+  const retryCountRef = useRef(0);
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
-    if (!isNative || !adConfig.adsEnabled || !nativeContainerRef.current) return;
+    if (!isNative || !adConfig.adsEnabled) return;
 
     let mounted = true;
-    const el = nativeContainerRef.current;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    retryCountRef.current = 0;
+    setPermanentlyFailed(false);
 
-    getSharedNativeAdFeed(adConfig.nativeId).then((feed) => {
-      if (!mounted || !feed || !el) return;
-      try {
-        feed.attach(slotKey, el);
-        setNativeLoaded(true);
-      } catch {
-        setNativeLoaded(false);
+    const unsubscribe = subscribeNativeSlotStatus(slotKey, (status) => {
+      if (!mounted) return;
+      setSlotStatus(status);
+
+      if (status === 'loaded') {
+        retryCountRef.current = 0;
+        setPermanentlyFailed(false);
+        return;
+      }
+
+      if (status === 'failed') {
+        if (retryCountRef.current < 2) {
+          const attempt = retryCountRef.current;
+          retryCountRef.current += 1;
+          const delayMs = attempt === 0 ? 5000 : 15000;
+          retryTimer = setTimeout(() => {
+            if (!mounted) return;
+            setSlotStatus('loading');
+            getSharedNativeAdFeed(adConfig.nativeId).then((feed) => {
+              if (!mounted || !feed) return;
+              feed.reload(slotKey).catch(() => {
+                if (mounted && retryCountRef.current >= 2) {
+                  setPermanentlyFailed(true);
+                }
+              });
+            });
+          }, delayMs);
+        } else {
+          setPermanentlyFailed(true);
+        }
       }
     });
 
-    return () => {
-      mounted = false;
+    const el = nativeContainerRef.current;
+    if (el) {
       getSharedNativeAdFeed(adConfig.nativeId).then((feed) => {
-        if (feed && el) {
-          try {
-            feed.detach(el);
-          } catch {}
+        if (!mounted || !feed || !el) return;
+        try {
+          feed.attach(slotKey, el);
+        } catch (err) {
+          console.warn('NativeAdCard attach failed:', err);
+          setPermanentlyFailed(true);
         }
       });
+    }
+
+    return () => {
+      mounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      unsubscribe();
+      if (el) {
+        getSharedNativeAdFeed(adConfig.nativeId).then((feed) => {
+          if (feed && el) {
+            try {
+              feed.detach(el);
+            } catch {
+              // ignore
+            }
+          }
+        });
+      }
     };
   }, [isNative, adConfig.adsEnabled, adConfig.nativeId, slotKey]);
 
   if (!adConfig.adsEnabled) return null;
 
   if (isNative) {
+    if (permanentlyFailed && slotStatus === 'failed') {
+      return null;
+    }
+
     return (
       <article
         aria-label="Sponsored Native Ad"
-        className="relative my-2 flex flex-col justify-between p-4 rounded-3xl bg-slate-900/95 [body.light_&]:bg-white [body.amoled_&]:bg-neutral-950 border-2 border-amber-500/30 [body.light_&]:border-amber-300/70 shadow-xl overflow-hidden min-h-[330px]"
+        className="relative my-2 flex flex-col justify-between p-4 rounded-3xl bg-slate-900/95 [body.light_&]:bg-white [body.amoled_&]:bg-neutral-950 border-2 border-amber-500/30 [body.light_&]:border-amber-300/70 shadow-xl"
       >
         <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800/80 [body.light_&]:border-slate-200 px-1">
           <div className="flex items-center gap-1.5">
@@ -62,17 +117,21 @@ export const NativeAdCard: React.FC<NativeAdCardProps> = ({
           <span className="text-[10px] text-slate-500">Sponsored</span>
         </div>
 
-        <div
-          ref={nativeContainerRef}
-          className="w-full flex-1 min-h-[270px] rounded-2xl overflow-hidden"
-        />
+        {/* NativeAdTemplate.Medium requires minimum 300px height and >=144px width */}
+        <div className="relative w-full" style={{ width: '100%', height: '320px', minHeight: '320px' }}>
+          <div
+            ref={nativeContainerRef}
+            className="w-full rounded-2xl"
+            style={{ width: '100%', height: '320px', minHeight: '320px' }}
+          />
 
-        {!nativeLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-5 text-center pointer-events-none">
-            <Sparkles className="w-6 h-6 text-amber-400 mb-2 animate-pulse" />
-            <p className="text-xs text-slate-400">प्रायोजित विज्ञापन</p>
-          </div>
-        )}
+          {slotStatus !== 'loaded' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-5 text-center pointer-events-none rounded-2xl bg-slate-950/60">
+              <Sparkles className="w-6 h-6 text-amber-400 mb-2 animate-pulse" />
+              <p className="text-xs text-slate-400">प्रायोजित विज्ञापन लोड हो रहा है...</p>
+            </div>
+          )}
+        </div>
       </article>
     );
   }

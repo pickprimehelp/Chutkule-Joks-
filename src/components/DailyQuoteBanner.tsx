@@ -22,6 +22,7 @@ interface DailyQuoteBannerProps {
   onOpenCardModal: (item: Item) => void;
   onRequestRewardedAd?: (onSuccess: () => void) => void;
   onShowCardReady?: (data: CardReadyData) => void;
+  onUserAction?: () => void;
 }
 
 export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
@@ -31,6 +32,7 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
   onOpenCardModal,
   onRequestRewardedAd,
   onShowCardReady,
+  onUserAction,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -69,6 +71,7 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
     } else if (result.success) {
       setShareStatus('✅ केवल फोटो WhatsApp पर शेयर करें!');
     }
+    onUserAction?.();
     setTimeout(() => setShareStatus(null), 3000);
   };
 
@@ -98,6 +101,7 @@ export const DailyQuoteBanner: React.FC<DailyQuoteBannerProps> = ({
     } else {
       setShareStatus('✅ फोटो कार्ड तैयार है!');
     }
+    onUserAction?.();
     setTimeout(() => setShareStatus(null), 3500);
   };
 

@@ -69,6 +69,8 @@ export default function App() {
     adConfig,
     isInterstitialOpen,
     isRewardedOpen,
+    adNotice,
+    dismissAdNotice,
     showRewarded,
     closeInterstitial,
     closeRewarded,
@@ -131,6 +133,7 @@ export default function App() {
     setSelectedCategoryId(catId);
     setDisplayCount(ITEMS_PER_PAGE);
     setSearchQuery('');
+    trackShareAction();
   };
 
   const handleRandomShuffle = () => {
@@ -213,9 +216,11 @@ export default function App() {
               onRefreshDaily={() => setDailyCategorySeed((s) => s + 1)}
               onRequestRewardedAd={(onSuccess) => showRewarded(onSuccess)}
               onShowCardReady={(data) => setCardReadyData(data)}
-              onOpenCardModal={(item) =>
-                setActiveCardItem({ item, categoryId: item.categoryId || currentCategory.id })
-              }
+              onUserAction={trackShareAction}
+              onOpenCardModal={(item) => {
+                trackShareAction();
+                setActiveCardItem({ item, categoryId: item.categoryId || currentCategory.id });
+              }}
             />
 
           )
@@ -280,8 +285,8 @@ export default function App() {
                 const itemCat =
                   CATEGORIES.find((c) => c.id === item.categoryId) || currentCategory;
 
-                // Inject Native Ad conservatively (only after 8 items, then every 18 items)
-                const showNativeAdHere = index === 7 || (index > 7 && (index - 7) % 18 === 0);
+                // Inject Native Ad safely (after 4 items so it is visible in feed, then every 16 items)
+                const showNativeAdHere = index === 3 || (index > 3 && (index - 3) % 16 === 0);
 
                 return (
                   <React.Fragment key={item.id}>
@@ -298,6 +303,7 @@ export default function App() {
                       onToggleFavorite={toggleFavorite}
                       onRequestRewardedAd={(onSuccess) => showRewarded(onSuccess)}
                       onShowCardReady={(data) => setCardReadyData(data)}
+                      onUserAction={trackShareAction}
                       onOpenCardModal={(clicked) => {
                         trackShareAction();
                         setActiveCardItem({ item: clicked, categoryId: itemCat.id });
@@ -414,6 +420,20 @@ export default function App() {
               ✕
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Ad Status Notice Toast */}
+      {adNotice && (
+        <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-50 p-3.5 rounded-2xl bg-slate-900/95 border border-amber-500/50 shadow-2xl text-white flex items-start justify-between gap-3">
+          <p className="text-xs text-amber-200 leading-relaxed font-medium">{adNotice}</p>
+          <button
+            onClick={dismissAdNotice}
+            className="p-1 rounded-lg text-slate-400 hover:text-white shrink-0"
+            aria-label="बंद करें"
+          >
+            ✕
+          </button>
         </div>
       )}
 
